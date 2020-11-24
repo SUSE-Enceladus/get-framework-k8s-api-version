@@ -1,0 +1,56 @@
+#! /usr/bin/python3
+
+# Copyright 2020 SUSE LLC
+#
+# This file is part of get-kubectl-version
+#
+# get-kubectl-version is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# get-kubectl-version is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# get-kubectl-version. If not, see <http://www.gnu.org/licenses/>.
+
+import logging
+import argparse
+from getframeworkk8sapiversion import frameworkfactory
+
+
+log_file = './get-framework-k8s-api-version.log'
+log_to_file = logging.FileHandler(log_file)
+log_to_file.setLevel(logging.INFO)
+log = logging.getLogger('get-framework-k8s-api-version')
+log.setLevel(logging.INFO)
+log.addHandler(log_to_file)
+
+parser = argparse.ArgumentParser()
+subparsers = parser.add_subparsers(help='Frameworks supported')
+
+az_help = '--client-id <client-id> --client-secret <client-secret> ' \
+    '--tenant-d <tenand-id> --subscription-d <subs-id> --location <location>'
+az_parser = subparsers.add_parser('az', help=az_help)
+az_parser.add_argument('--client-id', nargs='?', const=None)
+az_parser.add_argument('--client-secret', nargs='?', const=None)
+az_parser.add_argument('--tenant-id', nargs='?', const=None)
+az_parser.add_argument('--subscription-id', nargs='?', const=None)
+az_parser.add_argument('--location', nargs='?', const=None)
+az_parser.set_defaults(az_parser=True)
+
+ec2_help = '--aws-access-key-id <access-key> --aws-secret-access-key ' \
+    '<secret-access> --region-name <region>'
+ec2_parser = subparsers.add_parser('ec2', help=ec2_help)
+ec2_parser.add_argument('--aws-access-key-id', nargs='?', const=None)
+ec2_parser.add_argument('--aws-secret-access-key', nargs='?', const=None)
+ec2_parser.add_argument('--region-name', nargs='?', const=None)
+ec2_parser.set_defaults(ec2_parser=True)
+
+csp_api = parser.parse_args()
+kube_version = frameworkfactory.get_k8s_version(log, vars(csp_api))
+
+print(kube_version)
