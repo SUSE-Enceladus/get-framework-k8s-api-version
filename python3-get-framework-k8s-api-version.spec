@@ -32,8 +32,8 @@ Requires:       python3-requests
 %if %{is_azure}
 Requires: python3-azure-mgmt-containerservice
 Requires: python3-msrestazure
-RequireS: python3-azure-common
-RequireS: python3-azure-identity
+Requires: python3-azure-common
+Requires: python3-azure-identity
 %endif
 Requires:       python3-boto3
 BuildRequires:  python3-setuptools
