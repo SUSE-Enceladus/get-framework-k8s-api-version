@@ -15,60 +15,49 @@
 # You should have received a copy of the GNU General Public License along with
 # get-kubectl-version. If not, see <http://www.gnu.org/licenses/>.
 
-import requests
 from packaging import version
+from azure.identity import ClientSecretCredential
+from azure.mgmt.containerservice import ContainerServiceClient
+from msrestazure.azure_exceptions import CloudError
+from azure.core.exceptions import (
+    ResourceNotFoundError,
+    ClientAuthenticationError
+)
 
 
 class AzureKubeCtlVersion(object):
     def __init__(
         self, client_id, client_secret, tenant_id, subscription_id, location
     ):
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.tenant_id = tenant_id
-        self.subscription_id = subscription_id
         self.location = location
-
-    def get_access_token(self):
-        url = 'https://login.microsoftonline.com/{}/oauth2/token'.format(
-            self.tenant_id
+        self.credential = ClientSecretCredential(
+            tenant_id=tenant_id,
+            client_id=client_id,
+            client_secret=client_secret
         )
-        data = {
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "grant_type": "client_credentials",
-            "resource": "https://management.azure.com"
-        }
-        response = requests.post(url, data=data)
-        return response.json()['access_token']
+        self.container_client = ContainerServiceClient(
+            subscription_id=subscription_id,
+            credential=self.credential
+        )
 
     def get_orchestrators(self):
-        self.access_token = self.get_access_token()
-        url_kubeversions = "https://management.azure.com/subscriptions/" \
-            "{subscription}/providers/Microsoft.ContainerService/locations/" \
-            "{location}/orchestrators?api-version=2019-08-01".format(
-                subscription=self.subscription_id,
+        try:
+            return self.container_client.container_services.list_orchestrators(
                 location=self.location
-            )
-        bearer_token = {"Authorization": 'Bearer {}'.format(self.access_token)}
-        response = requests.get(url_kubeversions, headers=bearer_token)
-        return response.json()['properties']['orchestrators']
+            ).orchestrators
+        except CloudError as err:
+            message = "Error trying to list orchestrators: {}".format(err)
+            print(message)
+            raise Exception(message) from err
+        except ClientAuthenticationError as err:
+            print(err)
+            raise err
+        except ResourceNotFoundError as err:
+            message = "Resource not found: {}".format(err)
+            print(message)
+            raise Exception(message) from err
 
     def get_latest_k8s_version(self):
-        try:
-            self.orchestrators = self.get_orchestrators()
-            k8s_version = '0'
-            for elem in self.orchestrators:
-                fetched_ver = elem['orchestratorVersion']
-                needs_update = (
-                    elem['orchestratorType'] == 'Kubernetes'
-                    and version.parse(fetched_ver) > version.parse(k8s_version)
-                )
-                if needs_update:
-                    k8s_version = fetched_ver
-
-            return k8s_version
-        except requests.exceptions.RequestException as err:
-            raise err
-        except KeyError as err:
-            raise err
+        orchestrators = self.get_orchestrators()
+        return str(max([version.parse(x.orchestrator_version) for x in
+                        orchestrators if x.orchestrator_type == 'Kubernetes']))

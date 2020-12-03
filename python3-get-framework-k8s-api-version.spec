@@ -17,9 +17,11 @@
 
 
 %define upstream_name get-framework-k8s-api-version
+%define is_azure "%(sudo dmidecode -s bios-vendor | grep Microsoft)"
+%define is_google "%(sudo dmidecode -s bios-vendor | grep Google)"
 
 Name:           python3-get-framework-k8s-api-version
-Version:        0.0.1
+Version:        0.0.3
 Release:        0
 Summary:        latest version of k8s API server
 License:        GPL-3.0+
@@ -27,6 +29,12 @@ Url:            https://github.com/SUSE-Enceladus/get-framework-k8s-api-version
 Source0:        %{upstream_name}-%{version}.tar.bz2
 Requires:       python3
 Requires:       python3-requests
+%if %{is_azure}
+Requires: python3-azure-mgmt-containerservice
+Requires: python3-msrestazure
+RequireS: python3-azure-common
+RequireS: python3-azure-identity
+%endif
 Requires:       python3-boto3
 BuildRequires:  python3-setuptools
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build

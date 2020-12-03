@@ -1,23 +1,29 @@
 from unittest.mock import patch
+
 import logging
-from getframeworkk8sapiversion.frameworkfactory import get_k8s_version
 import botocore
-import requests
-from pytest import raises
+from azure.core.exceptions import ClientAuthenticationError
+
+from getframeworkk8sapiversion.frameworkfactory import get_k8s_version
 
 log = logging.getLogger('foo')
 
-aws_dict = {'ec2_parser': True, 'aws_access_key_id': 'access_key',
-             'aws_secret_access_key': 'secret',
-             'region_name': 'eu-west-1'}
+aws_dict = {
+    'ec2_parser': True, 'aws_access_key_id': 'access_key',
+    'aws_secret_access_key': 'secret',
+    'region_name': 'eu-west-1'
+}
 
-azure_dict = {'az_parser': True, 'client_id': 'client_id',
-            'client_secret': 'secret',
-            'tenant_id': 'tenant',
-            'subscription_id': 'subscription',
-            'location': 'westus2'}
+azure_dict = {
+    'az_parser': True, 'client_id': 'client_id',
+    'client_secret': 'secret',
+    'tenant_id': 'tenant',
+    'subscription_id': 'subscription',
+    'location': 'westus2'
+}
 
-gce_dict = { 'gce_parser': True }
+gce_dict = {'gce_parser': True}
+
 
 class TestGetKubeVersion(object):
     @patch('getframeworkk8sapiversion.azure.AzureKubeCtlVersion.get_latest_k8s_version')
@@ -25,14 +31,16 @@ class TestGetKubeVersion(object):
         get_k8s_version(log, azure_dict)
 
     @patch('logging.Logger.error')
-    @patch('requests.post')
-    def test_get_k8s_version_azure_exception(
-        self, mock_post_request, mock_log_error
+    @patch('azure.mgmt.containerservice.v2017_07_01.operations._container_services_operations.ContainerServicesOperations.list_orchestrators')
+    @patch('azure.mgmt.containerservice.ContainerServiceClient')
+    @patch('azure.identity.ClientSecretCredential')
+    def test_get_latest_k8s_version_raise_exception(
+        self, mock_credential, mock_container_client,
+        mock_list_orchestrators, mock_log_error
     ):
-        mock_post_request.side_effect = requests.exceptions.RequestException
+        mock_list_orchestrators.side_effect = ClientAuthenticationError('foo')
         get_k8s_version(log, azure_dict)
         assert mock_log_error.called
-
 
     @patch('logging.Logger.error')
     @patch('boto3.client')

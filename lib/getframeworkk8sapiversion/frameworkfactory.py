@@ -14,25 +14,23 @@
 #
 # You should have received a copy of the GNU General Public License along with
 # get-kubectl-version. If not, see <http://www.gnu.org/licenses/>.
-import sys
 
 def get_k8s_version(log, credentials):
     if credentials.get('az_parser'):
         from getframeworkk8sapiversion import azure
 
+        azure_instance = azure.AzureKubeCtlVersion(
+            client_id=credentials.get('client_id'),
+            client_secret=credentials.get('client_secret'),
+            tenant_id=credentials.get('tenant_id'),
+            subscription_id=credentials.get('subscription_id'),
+            location=credentials.get('location')
+        )
         try:
-            return azure.AzureKubeCtlVersion(
-                client_id=credentials.get('client_id'),
-                client_secret=credentials.get('client_secret'),
-                tenant_id=credentials.get('tenant_id'),
-                subscription_id=credentials.get('subscription_id'),
-                location=credentials.get('location')
-            ).get_latest_k8s_version()
+            return azure_instance.get_latest_k8s_version()
         except Exception as err:
             log.error(err)
-            print(err)
             return
-
     if credentials.get('ec2_parser'):
         from getframeworkk8sapiversion import aws
 
