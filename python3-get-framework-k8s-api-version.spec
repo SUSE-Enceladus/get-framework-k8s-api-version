@@ -17,6 +17,8 @@
 
 
 %define upstream_name get-framework-k8s-api-version
+# this code is intended to be run in an instance of any of the supported CSPs,
+# where this info is available.
 %define is_azure "%(sudo dmidecode -s bios-vendor | grep Microsoft)"
 %define is_google "%(sudo dmidecode -s bios-vendor | grep Google)"
 
