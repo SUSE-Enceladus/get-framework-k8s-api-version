@@ -17,6 +17,8 @@
 
 
 %define upstream_name get-framework-k8s-api-version
+# this code is intended to be run in an instance of any of the supported CSPs,
+# where this info is available.
 %define is_aws "%(if [ -e /sys/hypervisor/uuid ]; then grep -r ^ec2 /sys/hypervisor/uuid; else echo 0; fi)"
 
 Name:           python3-get-framework-k8s-api-version
