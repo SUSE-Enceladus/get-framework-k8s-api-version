@@ -17,9 +17,12 @@
 
 
 %define upstream_name get-framework-k8s-api-version
+# this code is intended to be run in an instance of any of the supported CSPs,
+# where this info is available.
+%define is_aws "%(if [ -e /sys/hypervisor/uuid ]; then grep -r ^ec2 /sys/hypervisor/uuid; else echo 0; fi)"
 
 Name:           python3-get-framework-k8s-api-version
-Version:        0.0.1
+Version:        0.0.2
 Release:        0
 Summary:        latest version of k8s API server
 License:        GPL-3.0+
@@ -27,7 +30,9 @@ Url:            https://github.com/SUSE-Enceladus/get-framework-k8s-api-version
 Source0:        %{upstream_name}-%{version}.tar.bz2
 Requires:       python3
 Requires:       python3-requests
+%if %{is_aws}
 Requires:       python3-boto3
+%endif
 BuildRequires:  python3-setuptools
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
