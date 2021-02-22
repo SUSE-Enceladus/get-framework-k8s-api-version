@@ -35,7 +35,7 @@ Requires:       python3-requests
 Requires: python3-azure-mgmt-containerservice
 Requires: python3-msrestazure
 Requires: python3-azure-common
-Requires: python3-azure-identity
+Requires: python3-azure-identity	>= 1.5.0
 %endif
 Requires:       python3-boto3
 BuildRequires:  python3-setuptools
