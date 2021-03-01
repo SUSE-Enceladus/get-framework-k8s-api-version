@@ -2,8 +2,14 @@ from unittest.mock import (
     patch, Mock
 )
 from getframeworkk8sapiversion.azure import AzureKubeCtlVersion
-import requests
 from pytest import raises
+from msrestazure.azure_exceptions import CloudError
+from requests import Response
+from azure.core.exceptions import (
+    ResourceNotFoundError,
+    ClientAuthenticationError
+)
+
 
 class TestAzureKubeCtlVersion(object):
     def setup(self):
@@ -15,71 +21,88 @@ class TestAzureKubeCtlVersion(object):
             location='westus2'
         )
 
-    @patch('requests.post')
-    def test_get_access_token(self, mock_post_request):
-        response_json = { 'access_token': 'foo' }
-        mock_response = Mock()
-        mock_post_request.return_value = mock_response
-        mock_response.json.return_value = response_json
-        assert self.azure_kubectl.get_access_token() == 'foo'
-
-
-    @patch('getframeworkk8sapiversion.azure.AzureKubeCtlVersion.get_access_token')
-    @patch('requests.get')
-    def test_get_orchestrators(self, mock_get_request, mock_get_access_token):
-        response_json = {
-            'properties': {
-                'orchestrators': [
-                    {
-                        'orchestratorType': 'Kubernetes',
-                        'orchestratorVersion': '1.6.9'
-                    }
-                ]
-            }
-        }
-        mock_response = Mock()
-        mock_get_request.return_value = mock_response
-        mock_response.json.return_value = response_json
-        mock_get_access_token.return_value = 'foo'
-        assert self.azure_kubectl.get_orchestrators() ==  [
+    @patch('azure.mgmt.containerservice.v2017_07_01.operations._container_services_operations.ContainerServicesOperations.list_orchestrators')
+    @patch('azure.mgmt.containerservice.ContainerServiceClient')
+    @patch('azure.identity.ClientSecretCredential')
+    def test_get_orchestrators(
+        self, mock_credential, mock_container_service, mock_ok
+    ):
+        expected_orchestrators = [
             {
-                'orchestratorType': 'Kubernetes',
-                'orchestratorVersion': '1.6.9'
+                'orchestrator_version': '1.1.1',
+                'orchestrator_type': 'Kubernetes'
+            },
+            {
+                'orchestrator_version': '2.1.1',
+                'orchestrator_type': 'Kubernetes'
+            }
+        ]
+        mock_ok.return_value.orchestrators = expected_orchestrators
+        assert self.azure_kubectl.get_orchestrators() == [
+            {
+                'orchestrator_version': '1.1.1',
+                'orchestrator_type': 'Kubernetes'
+            },
+            {
+                'orchestrator_version': '2.1.1',
+                'orchestrator_type': 'Kubernetes'
             }
         ]
 
-    @patch('getframeworkk8sapiversion.azure.AzureKubeCtlVersion.get_access_token')
     @patch('getframeworkk8sapiversion.azure.AzureKubeCtlVersion.get_orchestrators')
-    def test_get_latest_k8s_version(
-        self, mock_get_orchestrators, mock_get_access_token
-    ):
-        orchestrators = [
-            {
-                'orchestratorType': 'Kubernetes',
-                'orchestratorVersion': '1.6.9'
-            }
+    def test_get_latest_k8s_version(self, mock_get_orchestrators):
+        orchestrator_mocked = Mock()
+        orchestrator_mocked.orchestrator_version = '1.6.9'
+        orchestrator_mocked.orchestrator_type = 'Kubernetes'
+        orchestrator_mocked_b = Mock()
+        orchestrator_mocked_b.orchestrator_version = '21.6.9'
+        orchestrator_mocked_b.orchestrator_type = 'Kubernetes'
+
+        mock_get_orchestrators.return_value = [
+            orchestrator_mocked,
+            orchestrator_mocked_b
         ]
-        mock_get_orchestrators.return_value = orchestrators
-        mock_get_access_token.return_value = 'foo;'
+        assert self.azure_kubectl.get_latest_k8s_version() == '21.6.9'
 
-        assert self.azure_kubectl.get_latest_k8s_version() == '1.6.9'
-
-
-    @patch('requests.post')
-    def test_get_latest_k8s_version_raise_exception(
-        self, mock_post_request
+    @patch('azure.mgmt.containerservice.v2017_07_01.operations._container_services_operations.ContainerServicesOperations.list_orchestrators')
+    @patch('azure.mgmt.containerservice.ContainerServiceClient')
+    @patch('azure.identity.ClientSecretCredential')
+    def test_get_orchestrators_raise_exception(
+        self, mock_credential, mock_container_client,
+        mock_list_orchestrators
     ):
-        mock_post_request.side_effect = requests.exceptions.RequestException
-        with raises(requests.exceptions.RequestException):
-            self.azure_kubectl.get_latest_k8s_version()
+        fake_response = Response()
+        fake_response.message = 'foo'
+        fake_response.status_code = 400
+        fake_response.reason = 'Bad Request'
+        mock_list_orchestrators.side_effect = CloudError(fake_response)
+        with raises(Exception):
+            assert self.azure_kubectl.get_orchestrators()
 
-    @patch('requests.post')
-    def test_get_latest_k8s_version_raise_exception_key(
-        self, mock_post_request
+    @patch('logging.Logger.error')
+    @patch('azure.mgmt.containerservice.v2017_07_01.operations._container_services_operations.ContainerServicesOperations.list_orchestrators')
+    @patch('azure.mgmt.containerservice.ContainerServiceClient')
+    @patch('azure.identity.ClientSecretCredential')
+    def test_get_latest_k8s_version_raise_exception_auth(
+        self, mock_credential, mock_container_client,
+            mock_list_orchestrators, mock_log_error
     ):
-        mock_response = Mock()
-        mock_response.json.return_value = {'foo': 'bar'}
-        mock_post_request.return_value = mock_response
+        mock_list_orchestrators.side_effect = ClientAuthenticationError('foo')
+        with raises(ClientAuthenticationError):
+            self.azure_kubectl.get_orchestrators()
+            assert mock_log_error.called
+            mock_log_error.assert_called_with('foo')
 
-        with raises(KeyError):
-            self.azure_kubectl.get_latest_k8s_version()
+    @patch('logging.Logger.error')
+    @patch('azure.mgmt.containerservice.v2017_07_01.operations._container_services_operations.ContainerServicesOperations.list_orchestrators')
+    @patch('azure.mgmt.containerservice.ContainerServiceClient')
+    @patch('azure.identity.ClientSecretCredential')
+    def test_get_latest_k8s_version_raise_exception_wrong_subscription(
+        self, mock_credential, mock_container_client,
+        mock_list_orchestrators, mock_log_error
+    ):
+        mock_list_orchestrators.side_effect = ResourceNotFoundError('foo')
+
+        with raises(Exception):
+            self.azure_kubectl.get_orchestrators()
+            assert mock_log_error.called
