@@ -33,7 +33,7 @@ parser = argparse.ArgumentParser()
 subparsers = parser.add_subparsers(help='Frameworks supported')
 
 az_help = '--client-id <client-id> --client-secret <client-secret> ' \
-    '--tenant-d <tenand-id> --subscription-d <subs-id> --location <location>'
+    '--tenant-id <tenand-id> --subscription-id <subs-id> --location <location>'
 az_parser = subparsers.add_parser('az', help=az_help)
 az_parser.add_argument('--client-id', nargs='?', const=None)
 az_parser.add_argument('--client-secret', nargs='?', const=None)
